@@ -189,7 +189,9 @@ while 1:
         
     if (len(orders) == 0):
         trailing = 0 
-    
+        flag = 0
+        time.sleep(5)
+        
     if (not _tendencia_ma50_4hs_15minCandles_()):    
         print("      Tentência: Baixa")
         time.sleep(10)
