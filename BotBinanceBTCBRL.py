@@ -151,11 +151,7 @@ while 1:
     qtd = qtd_formatada (TotalBTC,8)     
     clear_output(wait=True)
     print("********** " + symbolTicker + " **********")
-    print("      PreçoAtual: " + str(symbolPrice))
-    #print("      ME 5 Atual: "  + str(round(ma5,2)))
-    #print("      ME 11 Atual: "  + str(round(ma11,2)))
-    #print("      ME 33 Atual: "  + str(round(ma33,2)))
-    #print("      ME 50 Atual: "  + str(ma50))    
+    print("      PreçoAtual: " + str(symbolPrice))   
     if ((str(round(ma5,2))) > (str(round(ma11,2)))):
         print("      EMA05 > EMA11 = Ok")
     else:
@@ -240,7 +236,8 @@ while 1:
                 )  
             
             if (len(orders) == 0):
-                trailing = 0                 
+                trailing = 0  
+                
                 # envia e-mail, somente texto
                 message = MIMEText('Venda-Stop Trailling - BTCBRL')
                 message['subject'] = 'Venda BTC'
