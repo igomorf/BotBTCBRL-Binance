@@ -187,6 +187,9 @@ while 1:
         time.sleep(10)
         continue 
         
+    if (len(orders) == 0):
+        trailing = 0 
+    
     if (not _tendencia_ma50_4hs_15minCandles_()):    
         print("      Tentência: Baixa")
         time.sleep(10)
@@ -220,32 +223,26 @@ while 1:
 
             #for tick_2 in list_of_tickers:
                 #if tick_2['symbol'] == symbolTicker:
-                    #symbolPrice = float(tick_2['price']) 
-        
-            if trailing == 0:
-                trailing = 1
+                    #symbolPrice = float(tick_2['price'])         
                
-                sellOrder = client.create_order(
-                    symbol = symbolTicker,
-                    side = 'SELL',
-                    type = 'STOP_LOSS_LIMIT',            
-                    quantity = float(round(float((TotalBRL/symbolPrice * Percentual)),6)),
-                    price = float(round(float(symbolPrice-atrstop-310),0)),
-                    stopPrice = float(round(float(symbolPrice-atrstop-300),0)),            
-                    timeInForce = 'GTC'
-                )  
+            sellOrder = client.create_order(
+                symbol = symbolTicker,
+                side = 'SELL',
+                type = 'STOP_LOSS_LIMIT',            
+                quantity = float(round(float((TotalBRL/symbolPrice * Percentual)),6)),
+                price = float(round(float(symbolPrice-atrstop-310),0)),
+                stopPrice = float(round(float(symbolPrice-atrstop-300),0)),            
+                timeInForce = 'GTC'
+            )  
             
-            if (len(orders) == 0):
-                trailing = 0  
-                
-                # envia e-mail, somente texto
-                message = MIMEText('Venda-Stop Trailling - BTCBRL')
-                message['subject'] = 'Venda BTC'
-                message['from'] = from_addr
-                message['to'] = ', '.join(to_addrs)               
-                server = smtplib.SMTP_SSL(smtp_ssl_host, smtp_ssl_port)               
-                server.login(username, password)
-                server.sendmail(from_addr, to_addrs, message.as_string())
-                server.quit()
+            # envia e-mail, somente texto
+            message = MIMEText('Venda-Stop Trailling - BTCBRL')
+            message['subject'] = 'Venda BTC'
+            message['from'] = from_addr
+            message['to'] = ', '.join(to_addrs)               
+            server = smtplib.SMTP_SSL(smtp_ssl_host, smtp_ssl_port)               
+            server.login(username, password)
+            server.sendmail(from_addr, to_addrs, message.as_string())
+            server.quit()
             
         time.sleep(5)
