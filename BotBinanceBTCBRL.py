@@ -15,7 +15,7 @@ import smtplib
 from email.mime.text import MIMEText
 from IPython.display import clear_output
 
-client = Client(config.API_KEY, config.API_SECRET, tld='com')
+client = Client(config.API_KEY, config.API_SECRET, tld='com') #busca no arquivo config.py a API Key e a API Secret
 balanceBRL = client.get_asset_balance(asset='BRL')
 TotalBRL = float(balanceBRL['free'])
 symbolTicker = 'BTCBRL'
@@ -26,17 +26,19 @@ ma33 = 0
 ma50 = 0
 auxPrice = 0.0
 flag = 0
+flagNewCandle = 0
+newCandle = 0
 trailing = 0
-Percentual = float(0.90) # 0.20 seria 20% do balanço total
+Percentual = float(0.30) # 0.20 seria 20% do balanço total
 
 # conexão com os servidores do google
 smtp_ssl_host = 'smtp.gmail.com'
 smtp_ssl_port = 465
-# username ou email para logar no servidor GMAIL
-username = 'seu_email@gmail.com' #substitua pelo seu e-mail
-password = 'sua_senha' #substitua pela sua senha
-from_addr = 'seu_email@gmail.com' #substitua pelo seu e-mail
-to_addrs = ['seu_email@gmail.com'] #substitua pelo seu e-mail
+# username ou email para logar no servidor (busca no arquivo config.py usuário e senha)
+username = config.USERN
+password = config.PASSW
+from_addr = config.USERN
+to_addrs = [config.USERN]
 
 klines = client.get_historical_klines(symbolTicker, Client.KLINE_INTERVAL_15MINUTE, "15 hour ago UTC")
 df = pd.DataFrame(klines)
@@ -108,8 +110,9 @@ def _tendencia_ma50_4hs_15minCandles_():
 
     if (modelo[0]>0):
         resp = True
+
     return resp
-    
+
 while 1:
 
     time.sleep(3)
@@ -136,22 +139,22 @@ while 1:
     df.columns = ['open time', 'open', 'high', 'low', 'close', 'volume']
     dfhigh = df['high']
     dflow = df['low']
-    dfclose = df['close']
-    
-    #if (ma50 == 0): continue  
-    
+    dfclose = df['close']       
+        
     ma5 = EMA(dfclose, timeperiod=5).iloc[-1]
     ma11 = EMA(dfclose, timeperiod=11).iloc[-1] 
     ma33 = EMA(dfclose, timeperiod=33).iloc[-1]    
     ma50 = SMA(dfclose, timeperiod=50).iloc[-1]
     atrstop = ATR(dfhigh, dflow, dfclose, timeperiod=16).iloc[-1]
     
+    abertura = df['open'].iloc[-1]
+    
     balanceBTC = client.get_asset_balance(asset='BTC')
     TotalBTC = float(balanceBTC['free'])
     qtd = qtd_formatada (TotalBTC,8)     
     clear_output(wait=True)
-    print("********** " + symbolTicker + " **********")
-    print("      PreçoAtual: " + str(symbolPrice))   
+    print("********** " + symbolTicker + " **********") 
+    print("      PreçoAtual: " + str(symbolPrice))    
     if ((str(round(ma5,2))) > (str(round(ma11,2)))):
         print("      EMA05 > EMA11 = Ok")
     else:
@@ -168,13 +171,14 @@ while 1:
     print('      Saldo: ', str(round(TotalBRL,2)))
     print('      Percentual: ', str(Percentual*100),'%')
     print('      Valor da compra: ',  'R$',str(round(TotalBRL*Percentual,2)),' (',str(round(TotalBRL/symbolPrice * Percentual,6)),')')      
-    
+   
     ordQtd = float(round(float((TotalBRL/symbolPrice * Percentual)),6))
     
     if flag == 0:
         print("      AGUARDANDO ENTRADA")
     if flag == 1:
-        print("      COMPRADO: ", str(ordQtdVenda))            
+        print("      COMPRADO: ", str(ordQtdVenda)) 
+        
     try:
         orders = client.get_open_orders(symbol=symbolTicker)
     except Exception as e:
@@ -182,23 +186,45 @@ while 1:
         client = Client(config.API_KEY, config.API_SECRET, tld='com')
         continue
 
-    if (len(orders) != 0):
-        print("      Há ordem em aberto")
-        time.sleep(10)
-        continue 
+    if (flagNewCandle == 0):
+        newCandle = abertura
+        flagNewCandle = 1
         
-    if (len(orders) == 0):
-        trailing = 0 
+    if ((flagNewCandle == 1) & (newCandle != abertura)): 
+        if (len(orders) != 0):
+            NovoStop = float(round(float(symbolPrice-atrstop-300),0)) 
+             
+            if (float(NovoStop) > float(stopAtual)):
+                cancel = client.cancel_order(symbol = 'BTCBRL', orderId = sellOrder['orderId'])
+                trailing = 0
+                time.sleep(10)
+                sellOrder = client.create_order(
+                    symbol = symbolTicker,
+                    side = 'SELL',
+                    type = 'STOP_LOSS_LIMIT',            
+                    quantity = ordQtdVenda,                     
+                    price = float(round(float(symbolPrice-atrstop-310),0)),
+                    stopPrice = float(round(float(symbolPrice-atrstop-300),0)),            
+                    timeInForce = 'GTC'
+                )
+                if (trailing == 0) :
+                    stopAtual = float(round(float(symbolPrice-atrstop-300),0))                 
+                    trailing = 1
+        
+        flagNewCandle = 0 
+        
+    if (len(orders) == 0):       
         flag = 0
         time.sleep(5)
         
-    if (not _tendencia_ma50_4hs_15minCandles_()):    
+    if (not _tendencia_ma50_4hs_15minCandles_()):   
         print("      Tentência: Baixa")
         time.sleep(10)
         continue
-    else:
-        print("      Tendência: Alta")    
-        if ((len(orders) == 0) & (ma5 > ma33) & (ma11 > ma33) & (ma5 > ma11) & (flag == 0)):        
+    else: 
+        print("      Tendência: Alta") 
+        
+        if ((len(orders) == 0) & (ma5 > ma33) & (ma11 > ma33) & (ma5 > ma11) & (flag == 0)):
             flag = 1
             ordQtdVenda = ordQtd
             print("      Compra-Cruzamento-Tendência")            
@@ -215,6 +241,7 @@ while 1:
 
             # conectaremos de forma segura usando SSL
             server = smtplib.SMTP_SSL(smtp_ssl_host, smtp_ssl_port)
+            
             # para interagir com um servidor externo precisaremos
             # fazer login nele
             server.login(username, password)
@@ -223,28 +250,30 @@ while 1:
             
             time.sleep(10)
 
-            #for tick_2 in list_of_tickers:
-                #if tick_2['symbol'] == symbolTicker:
-                    #symbolPrice = float(tick_2['price'])         
-               
             sellOrder = client.create_order(
                 symbol = symbolTicker,
                 side = 'SELL',
                 type = 'STOP_LOSS_LIMIT',            
-                quantity = float(round(float((TotalBRL/symbolPrice * Percentual)),6)),
+                quantity = float(round(float((TotalBRL/symbolPrice * Percentual)),6)),                     
                 price = float(round(float(symbolPrice-atrstop-310),0)),
                 stopPrice = float(round(float(symbolPrice-atrstop-300),0)),            
                 timeInForce = 'GTC'
-            )  
+            )
             
-            # envia e-mail, somente texto
-            message = MIMEText('Venda-Stop Trailling - BTCBRL')
-            message['subject'] = 'Venda BTC'
-            message['from'] = from_addr
-            message['to'] = ', '.join(to_addrs)               
-            server = smtplib.SMTP_SSL(smtp_ssl_host, smtp_ssl_port)               
-            server.login(username, password)
-            server.sendmail(from_addr, to_addrs, message.as_string())
-            server.quit()
+            if (trailing == 0):
+                stopAtual = float(round(float(symbolPrice-atrstop-300),0))                 
+                trailing = 1
+        
+        # envia e-mail, somente texto
+        message = MIMEText('Stop de Venda pela ATR Trailling - BTCBRL')
+        message['subject'] = 'Stop Posicionado'
+        message['from'] = from_addr
+        message['to'] = ', '.join(to_addrs)
+
+        # conectaremos de forma segura usando SSL
+        server = smtplib.SMTP_SSL(smtp_ssl_host, smtp_ssl_port)        
+        server.login(username, password)
+        server.sendmail(from_addr, to_addrs, message.as_string())
+        server.quit()
             
         time.sleep(5)
